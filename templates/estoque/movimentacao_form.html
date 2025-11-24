@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-lg border-0 rounded-4">
+      <div class="card-body p-4">
+        <h3 class="text-center mb-4 text-primary fw-bold">Registrar Movimentacao</h3>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ form|crispy }}
+
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-icon">
+              <i class="bi bi-arrow-left"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary btn-icon">
+              <i class="bi bi-check-circle"></i> Registrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

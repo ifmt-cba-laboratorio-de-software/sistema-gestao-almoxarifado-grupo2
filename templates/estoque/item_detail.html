@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="card shadow-lg border-0 rounded-4">
+  <div class="card-body p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+      <div>
+        <h3 class="text-primary fw-bold mb-0">
+          {{ item.descricao }}
+          <small class="text-muted">({{ item.codigo }})</small>
+        </h3>
+        <small class="text-muted">Detalhes e ultimas movimentacoes</small>
+      </div>
+      <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-icon">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <p><strong>Unidade:</strong> {{ item.unidade_medida }}</p>
+        <p><strong>Valor Unitario:</strong> R$ {{ item.valor_unitario }}</p>
+      </div>
+      <div class="col-md-6">
+        <p><strong>Quantidade Atual:</strong>
+          {% if item.quantidade_atual <= item.estoque_minimo %}
+            <span class="badge bg-danger">{{ item.quantidade_atual }}</span>
+          {% else %}
+            <span class="badge bg-success">{{ item.quantidade_atual }}</span>
+          {% endif %}
+        </p>
+        <p><strong>Estoque Minimo:</strong> {{ item.estoque_minimo }} |
+           <strong>Maximo:</strong> {{ item.estoque_maximo }}
+        </p>
+      </div>
+    </div>
+
+    <hr>
+
+    <h5 class="text-secondary fw-bold mb-3">
+      <i class="bi bi-arrow-repeat"></i> Movimentacoes Recentes
+    </h5>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light text-center">
+          <tr>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Quantidade</th>
+            <th>Usuario</th>
+          </tr>
+        </thead>
+        <tbody class="text-center">
+          {% for m in movimentos %}
+            <tr>
+              <td>{{ m.data|date:"d/m/Y H:i" }}</td>
+              <td>
+                {% if m.tipo == 'ENTRADA' %}
+                  <span class="badge bg-success">Entrada</span>
+                {% elif m.tipo == 'SAIDA' %}
+                  <span class="badge bg-danger">Saida</span>
+                {% elif m.tipo == 'RETIRADA' %}
+                  <span class="badge bg-warning text-dark">Retirada</span>
+                {% else %}
+                  <span class="badge bg-info text-dark">Devolucao</span>
+                {% endif %}
+              </td>
+              <td>{{ m.quantidade }}</td>
+              <td>{{ m.usuario }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-muted py-3">Sem movimentacoes registradas.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
