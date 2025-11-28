@@ -9,4 +9,5 @@ urlpatterns = [
     path('item/<int:pk>/', views.item_detail, name='item_detail'),
     path('movimentacao/', views.movimentacao_list, name='movimentacao_list'),
     path('movimentacao/novo/', views.movimentacao_create, name='movimentacao_create'),
+    path('inventario/periodico/', views.relatorio_inventario_periodico, name='relatorio_inventario_periodico'),
 ]

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% block content %}
+
+<div class="container mt-5">
+    <h3 class="text-primary fw-bold mb-4">
+        🧾 Relatório de Inventário Periódico (Custo de Uso)
+    </h3>
+
+    <form method="get" class="row g-3 align-items-end mb-4 bg-light p-3 rounded-3">
+        <div class="col-md-4">
+            <label for="id_data_inicio" class="form-label">Data Início</label>
+            {# O uso dos valores do GET garante que a data digitada seja mantida após o cálculo #}
+            <input type="date" class="form-control" id="id_data_inicio" name="data_inicio" value="{{ data_inicio }}">
+        </div>
+        <div class="col-md-4">
+            <label for="id_data_fim" class="form-label">Data Fim</label>
+             {# O uso dos valores do GET garante que a data digitada seja mantida após o cálculo #}
+            <input type="date" class="form-control" id="id_data_fim" name="data_fim" value="{{ data_fim }}">
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-calculator"></i> Calcular
+            </button>
+        </div>
+    </form>
+    
+    <div class="card shadow-lg border-0 rounded-4 mb-4">
+        <div class="card-body p-4">
+            <h5 class="card-title text-secondary mb-3">Resumo do Período (De {{ data_inicio }} até {{ data_fim }})</h5>
+            <div class="row row-cols-1 row-cols-md-4 g-4 text-center">
+                
+                <div class="col">
+                    <div class="p-3 bg-info bg-opacity-10 rounded-3 border border-info">
+                        <small class="text-info">Estoque Inicial ({{ data_inicio }})</small>
+                        {# USO DO FILTRO |localize #}
+                        <h4 class="text-info">R$ {{ valor_estoque_inicial|localize }}</h4>
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="p-3 bg-success bg-opacity-10 rounded-3 border border-success">
+                        <small class="text-success">Compras (Entradas) no Período</small>
+                         {# USO DO FILTRO |localize #}
+                        <h4 class="text-success">R$ {{ valor_compras_liquidas|localize }}</h4>
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="p-3 bg-secondary bg-opacity-10 rounded-3 border border-secondary">
+                        <small class="text-secondary">Estoque Final ({{ data_fim }})</small>
+                         {# USO DO FILTRO |localize #}
+                        <h4 class="text-secondary">R$ {{ valor_estoque_final_contado|localize }}</h4>
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="p-3 bg-danger bg-opacity-10 rounded-3 border border-danger">
+                        <small class="text-danger fw-bold">CUSTO DE USO (Saídas)</small>
+                         {# USO DA NOVA VARIÁVEL 'custo_uso' E FILTRO |localize #}
+                        <h4 class="text-danger fw-bold">R$ {{ custo_uso|localize }}</h4>
+                    </div>
+                </div>
+
+            </div>
+            
+            <hr class="my-4">
+            
+            <h5 class="card-title text-secondary mb-3">Detalhamento do Estoque Final (Atual)</h5>
+            
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Código</th>
+                            <th>Descrição</th>
+                            <th class="text-center">Qtd. Atual</th>
+                            <th class="text-end">Custo Unitário</th>
+                            <th class="text-end">Valor Total (EF)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in itens %}
+                        <tr>
+                            <td>{{ item.codigo }}</td>
+                            <td>{{ item.descricao }}</td>
+                            <td class="text-center">{{ item.quantidade_atual }}</td>
+                             {# USO DO FILTRO |localize #}
+                            <td class="text-end">R$ {{ item.valor_unitario|localize }}</td>
+                             {# USO DO FILTRO |localize #}
+                            <td class="text-end fw-bold">R$ {{ item.valor_total_estoque|localize }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="4" class="text-end fw-bold">TOTAL ESTOQUE FINAL:</td>
+                            <td class="text-end fw-bold text-secondary">R$ {{ valor_estoque_final_contado|localize }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
