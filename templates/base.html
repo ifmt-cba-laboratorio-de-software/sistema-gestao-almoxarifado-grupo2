@@ -31,6 +31,10 @@
               <li class="nav-item">
                 <a class="nav-link {% if '/movimentacao/' in request.path %}active{% endif %}" aria-label="Registrar movimentacao" href="{% url 'movimentacao_list' %}">Registrar Movimentacao</a>
               </li>
+              
+              <li class="nav-item">
+              <a class="nav-link {% if '/inventario/periodico' in request.path %}active{% endif %}" href="{% url 'relatorio_inventario_periodico' %}">Relatório de Custo de Uso</a>
+            </li>
             </ul>
           </div>
           <ul class="navbar-nav align-items-center gap-2 ms-auto">
