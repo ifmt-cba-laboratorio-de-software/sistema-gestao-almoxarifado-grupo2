@@ -1,3 +1,35 @@
+
+﻿{% extends 'base.html' %}
+{% block content %}
+
+<div class="card shadow-lg border-0 rounded-4">
+  <div class="card-body">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+      <div class="hero-title">
+        <span class="icon-circle"><i class="bi bi-box-seam"></i></span>
+        <div>
+          <h3 class="fw-bold mb-0 text-primary">Itens do Almoxarifado</h3>
+          <small class="text-muted">Controle rapido e responsivo</small>
+        </div>
+      </div>
+      {% if perms.estoque.add_item %}
+      <a class="btn btn-primary btn-icon" href="{% url 'item_create' %}">
+        <i class="bi bi-plus-circle"></i> Novo Item
+      </a>
+      {% endif %}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle table-hover">
+        <thead class="table-light">
+          <tr class="text-center">
+            <th>Codigo</th>
+            <th>Descricao</th>
+            <th>Qtd. Atual</th>
+            <th>Estoque Minimo</th>
+            <th>Acoes</th>
+
 {% extends 'base.html' %}
 {% block content %}
 
@@ -44,14 +76,27 @@
             <td>
               <div class="d-flex justify-content-center gap-2">
                 {% if perms.estoque.change_item %}
+
+                  <a class="btn btn-sm btn-outline-secondary btn-icon px-3" href="{% url 'item_edit' item.pk %}">
+
                   <a class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" href="{% url 'item_edit' item.pk %}">
+
                     <i class="bi bi-pencil-square"></i> Editar
                   </a>
                 {% endif %}
                 {% if perms.estoque.delete_item %}
+
+                  <form method="post" action="{% url 'item_delete' item.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger btn-icon px-3 confirm-delete" data-name="{{ item.descricao }}">
+                      <i class="bi bi-trash"></i> Excluir
+                    </button>
+                  </form>
+
                   <a class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1" href="{% url 'item_delete' item.pk %}">
                     <i class="bi bi-trash"></i> Excluir
                   </a>
+
                 {% endif %}
               </div>
             </td>
@@ -61,6 +106,38 @@
           {% endfor %}
         </tbody>
       </table>
+
+    </div>
+
+    <nav aria-label="Paginacao de Itens" class="mt-3">
+      <ul class="pagination justify-content-center">
+        {% if items.has_previous %}
+          <li class="page-item"><a class="page-link" href="?page={{ items.previous_page_number }}">Anterior</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+        {% endif %}
+
+        {% for num in items.paginator.page_range %}
+          {% if items.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% else %}
+            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+          {% endif %}
+        {% empty %}
+          <li class="page-item active"><span class="page-link">1</span></li>
+        {% endfor %}
+
+        {% if items.has_next %}
+          <li class="page-item"><a class="page-link" href="?page={{ items.next_page_number }}">Proxima</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Proxima</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+</div>
+
+
 
       {% if items.has_other_pages %}
       <nav aria-label="Paginação de Itens" class="mt-3">

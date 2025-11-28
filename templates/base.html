@@ -1,9 +1,56 @@
+
+﻿{% load static %}
+=======
+
 <!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Sistema de Almoxarifado{% endblock %}</title>
+
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'css/styles.css' %}" rel="stylesheet">
+  </head>
+
+  <body>
+    <nav class="topbar navbar navbar-expand-lg">
+      <div class="container-fluid px-4 position-relative">
+        <button class="navbar-toggler me-2" type="button" data-bs-toggle="collapse" data-bs-target="#topNav" aria-label="Abrir menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse justify-content-between" id="topNav">
+          <div class="d-flex align-items-center gap-3 nav-center mx-auto">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+              <span class="icon-circle"><i class="bi bi-box-seam"></i></span>
+              <span class="fw-semibold">Almoxarifado</span>
+            </a>
+            <ul class="navbar-nav align-items-center gap-2">
+              <li class="nav-item">
+                <a class="nav-link {% if request.path == '/' %}active{% endif %}" aria-label="Ir para Itens" href="/">Itens</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if '/movimentacao/' in request.path %}active{% endif %}" aria-label="Registrar movimentacao" href="{% url 'movimentacao_list' %}">Registrar Movimentacao</a>
+              </li>
+              
+              <li class="nav-item">
+              <a class="nav-link {% if '/inventario/periodico' in request.path %}active{% endif %}" href="{% url 'relatorio_inventario_periodico' %}">Relatório de Custo de Uso</a>
+            </li>
+            </ul>
+          </div>
+          <ul class="navbar-nav align-items-center gap-2 ms-auto">
+            <li class="nav-item nav-user d-flex align-items-center text-secondary">
+              <span class="icon-circle nav-user-icon me-1"><i class="bi bi-person-circle"></i></span>
+              <span class="nav-user-name">{{ user.username }}</span>
+            </li>
+            <li class="nav-item ms-auto">
+              <a class="nav-link text-danger" href="{% url 'logout' %}">
+                <i class="bi bi-box-arrow-right text-danger"></i> Sair
+              </a>
+            </li>
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -87,10 +134,70 @@
                 </a>
               </li>
             {% endif %}
+
           </ul>
         </div>
       </div>
     </nav>
+
+
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <span class="icon-circle"><i class="bi bi-box-seam"></i></span>
+          <span class="label">Almoxarifado</span>
+        </div>
+
+        <button class="btn btn-outline-secondary btn-sm btn-icon w-100 sidebar-toggle" id="sidebar-toggle" type="button">
+          <i class="bi bi-list"></i> <span class="label">Menu</span>
+        </button>
+
+        <div class="user-panel">
+          <div class="icon-circle nav-user-icon"><i class="bi bi-person-circle"></i></div>
+          <div class="details">
+            <div class="name">{{ user.username }}</div>
+            <small class="text-muted">Logado</small>
+          </div>
+        </div>
+
+        <nav class="nav flex-column sidebar-nav">
+          <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+            <i class="bi bi-box"></i> <span class="label">Itens</span>
+          </a>
+          <a class="nav-link {% if '/movimentacao/' in request.path %}active{% endif %}" href="{% url 'movimentacao_list' %}">
+            <i class="bi bi-arrow-left-right"></i> <span class="label">Registrar Movimentacao</span>
+          </a>
+          <a class="nav-link logout" href="{% url 'logout' %}">
+            <i class="bi bi-box-arrow-right"></i> <span class="label">Sair</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          Versao 1.0.0
+        </div>
+      </aside>
+
+      <div class="app-main">
+        <main class="page-content">
+          <div id="flash-messages" class="d-none">
+            {% if messages %}
+              {% for message in messages %}
+                <div class="flash-message" data-level="{{ message.tags }}" data-text="{{ message }}"></div>
+              {% endfor %}
+            {% endif %}
+          </div>
+          {% block content %}{% endblock %}
+        </main>
+
+        <footer class="text-center py-2 text-muted small mt-4">
+          © {{ now|date:"Y" }} - Sistema de Almoxarifado
+        </footer>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{% static 'js/app.js' %}"></script>
     {% endif %}
 
     <main class="container mt-4 mb-5">

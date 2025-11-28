@@ -2,6 +2,11 @@ from pathlib import Path
 import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+USE_I18N = True
+USE_L10N = True
+LANGUAGE_CODE = 'pt-br'
+
 SECRET_KEY = 'troque-esta-chave-para-producao'
 DEBUG = True
 ALLOWED_HOSTS = []

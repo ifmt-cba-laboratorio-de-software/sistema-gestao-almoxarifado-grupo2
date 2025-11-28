@@ -47,5 +47,12 @@ class Movimentacao(models.Model):
                 self.item.quantidade_atual = 0
         self.item.save()
 
+
+     # NOVO: Calcula o valor total deste item em estoque
+    @property
+    def valor_total_estoque(self):
+        # O cálculo deve ser feito com o custo (valor_unitario)
+        return self.quantidade_atual * self.valor_unitario
+    
     def __str__(self):
         return f"{self.tipo} - {self.item.descricao} ({self.quantidade})"
