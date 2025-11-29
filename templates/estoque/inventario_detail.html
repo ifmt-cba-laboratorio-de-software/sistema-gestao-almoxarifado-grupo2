@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Inventário {{ inventario.data_inventario|date:"d/m/Y" }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Inventário {{ inventario.data_inventario|date:"d/m/Y" }}</h4>
+    <small class="text-muted">Responsável: {{ inventario.usuario.nome|default:inventario.usuario.username }}</small>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'inventario_list' %}"><i class="bi bi-arrow-left"></i> Voltar</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-3">Registrar contagem</h6>
+        <form method="post" class="mb-3 d-flex gap-2 align-items-end">
+          {% csrf_token %}
+          <div class="flex-grow-1">
+            <label class="form-label">Código (scanner/lookup)</label>
+            <input type="text" name="codigo_lookup" class="form-control" placeholder="Leia ou digite o código" autocomplete="off">
+          </div>
+          <div style="width:140px;">
+            <label class="form-label">Qtd.</label>
+            <input type="number" name="qtde_lookup" class="form-control" min="0" value="0">
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-upc-scan"></i> Registrar</button>
+        </form>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Item</label>
+            {{ form.item }}
+            {% for error in form.item.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantidade contada</label>
+            {{ form.qtde_contada }}
+            {% for error in form.qtde_contada.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-plus-circle"></i> Adicionar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-3">Itens contados</h6>
+        <form method="post" action="{% url 'inventario_encerrar' inventario.pk %}" class="d-flex gap-2 mb-3">
+          {% csrf_token %}
+          <select name="estoque_id" class="form-select" required style="max-width:260px;">
+            {% for est in estoques %}
+              <option value="{{ est.id }}">{{ est.localizacao }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-primary" type="submit"><i class="bi bi-check2-circle"></i> Encerrar e ajustar</button>
+        </form>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Item</th>
+                <th>Qtd. contada</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv_item in itens %}
+              <tr>
+                <td>{{ inv_item.item.descricao }}</td>
+                <td>{{ inv_item.qtde_contada }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="2" class="text-center text-muted py-3">Nenhuma contagem registrada.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
