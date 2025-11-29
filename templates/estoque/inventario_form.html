@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Novo inventário{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="mb-3">Novo inventário</h5>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Data do inventário</label>
+            {{ form.data_inventario }}
+            {% for error in form.data_inventario.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Observação</label>
+            {{ form.observacao }}
+            {% for error in form.observacao.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'inventario_list' %}">Cancelar</a>
+            <button class="btn btn-primary" type="submit">Criar inventário</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
