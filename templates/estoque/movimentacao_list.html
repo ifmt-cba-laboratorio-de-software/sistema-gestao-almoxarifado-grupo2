@@ -1,109 +1,54 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
+{% block title %}Movimentações{% endblock %}
 {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Movimentações</h4>
+    <small class="text-muted">Histórico das entradas/saídas por estoque.</small>
+  </div>
+  <a class="btn btn-primary btn-icon" href="{% url 'movimentacao_create' %}">
+    <i class="bi bi-plus-circle"></i> Nova movimentação
+  </a>
+</div>
 
-<div class="card shadow-lg border-0 rounded-4">
+<div class="card shadow-sm border-0">
   <div class="card-body">
-
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
-      <div class="hero-title">
-        <span class="icon-circle"><i class="bi bi-arrow-left-right"></i></span>
-        <div>
-          <h3 class="fw-bold mb-0 text-primary">Movimentacoes</h3>
-          <small class="text-muted">Historico recente de entradas e saídas</small>
-        </div>
-      </div>
-      {% if perms.estoque.add_movimentacao %}
-      <a class="btn btn-primary btn-icon" href="{% url 'movimentacao_create' %}">
-        <i class="bi bi-plus-circle"></i> Registrar Movimentacao
-      </a>
-      {% endif %}
-    </div>
-
     <div class="table-responsive">
       <table class="table align-middle table-hover">
-        <thead class="table-light text-center">
+        <thead class="table-light">
           <tr>
             <th>Data</th>
-            <th>Item</th>
             <th>Tipo</th>
-            <th>Quantidade</th>
-            <th>Usuario</th>
-            <th>Devolucao Prevista</th>
-            <th>Acoes</th>
+            <th>Item</th>
+            <th>Estoque</th>
+            <th>Qtd</th>
+            <th>Usuário</th>
           </tr>
         </thead>
-        <tbody class="text-center">
-          {% for m in movimentos %}
-            <tr>
-              <td>{{ m.data|date:"d/m/Y H:i" }}</td>
-              <td>{{ m.item }}</td>
-              <td>
-                {% if m.tipo == 'ENTRADA' %}
-                  <span class="badge bg-success">Entrada</span>
-                {% elif m.tipo == 'SAIDA' %}
-                  <span class="badge bg-danger">Saida</span>
-                {% elif m.tipo == 'RETIRADA' %}
-                  <span class="badge bg-warning text-dark">Retirada</span>
-                {% else %}
-                  <span class="badge bg-info text-dark">Devolucao</span>
-                {% endif %}
-              </td>
-              <td>{{ m.quantidade }}</td>
-              <td>{{ m.usuario }}</td>
-              <td>{% if m.data_devolucao_prevista %}{{ m.data_devolucao_prevista|date:"d/m/Y" }}{% else %}-{% endif %}</td>
-              <td>
-                <div class="d-flex justify-content-center gap-2">
-                  {% if perms.estoque.change_movimentacao %}
-                    <a class="btn btn-sm btn-outline-secondary btn-icon px-2" href="#" aria-label="Editar movimentacao">
-                      <i class="bi bi-pencil-square"></i>
-                    </a>
-                  {% endif %}
-                  {% if perms.estoque.delete_movimentacao %}
-                    <form method="post" action="#" class="d-inline">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-danger btn-icon px-2 confirm-delete" data-name="Movimentacao de {{ m.item }}" aria-label="Excluir movimentacao">
-                        <i class="bi bi-trash"></i>
-                      </button>
-                    </form>
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
+        <tbody>
+          {% for mov in movimentacoes %}
+          <tr>
+            <td>{{ mov.data_movimentacao|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if mov.tipo_movimentacao == 'ENTRADA' %}
+                <span class="badge bg-success">{{ mov.get_tipo_movimentacao_display }}</span>
+              {% elif mov.tipo_movimentacao == 'SAIDA' %}
+                <span class="badge bg-danger">{{ mov.get_tipo_movimentacao_display }}</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ mov.get_tipo_movimentacao_display }}</span>
+              {% endif %}
+            </td>
+            <td>{{ mov.item.descricao }}</td>
+            <td>{{ mov.estoque.localizacao }}</td>
+            <td>{{ mov.quantidade }}</td>
+            <td>{{ mov.usuario.username }}</td>
+          </tr>
           {% empty %}
-            <tr>
-              <td colspan="7" class="text-muted py-3">Nenhuma movimentacao registrada.</td>
-            </tr>
+          <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma movimentação encontrada.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-
-    <nav aria-label="Paginacao de Movimentacoes" class="mt-3">
-      <ul class="pagination justify-content-center">
-        {% if movimentos.has_previous %}
-          <li class="page-item"><a class="page-link" href="?page={{ movimentos.previous_page_number }}">Anterior</a></li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">Anterior</span></li>
-        {% endif %}
-
-        {% for num in movimentos.paginator.page_range %}
-          {% if movimentos.number == num %}
-            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-          {% else %}
-            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
-          {% endif %}
-        {% empty %}
-          <li class="page-item active"><span class="page-link">1</span></li>
-        {% endfor %}
-
-        {% if movimentos.has_next %}
-          <li class="page-item"><a class="page-link" href="?page={{ movimentos.next_page_number }}">Proxima</a></li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">Proxima</span></li>
-        {% endif %}
-      </ul>
-    </nav>
   </div>
 </div>
-
 {% endblock %}

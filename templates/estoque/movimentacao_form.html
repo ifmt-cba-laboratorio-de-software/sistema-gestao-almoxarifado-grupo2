@@ -1,63 +1,168 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %}
-
+{% block title %}Registrar movimentação{% endblock %}
 {% block content %}
-
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <div class="row justify-content-center">
-  <div class="col-md-8 col-lg-6">
-    <div class="card shadow-lg border-0 rounded-4">
-      <div class="card-body p-4">
-        <h3 class="text-center mb-4 text-primary fw-bold">Registrar Movimentacao</h3>
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h5 class="mb-0">Registrar movimentação</h5>
+            <small class="text-muted">Entrada, saída ou ajuste com validação de saldo.</small>
+          </div>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'movimentacao_list' %}">
+            <i class="bi bi-clock-history"></i> Histórico
+          </a>
+        </div>
 
-        <form method="post" novalidate>
+        <form method="post" novalidate id="mov-form">
           {% csrf_token %}
-          {{ form|crispy }}
-
-          <div class="d-flex justify-content-between mt-4">
-            <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-icon">
-              <i class="bi bi-arrow-left"></i> Cancelar
-            </a>
-            <button type="submit" class="btn btn-primary btn-icon">
-              <i class="bi bi-check-circle"></i> Registrar
-            </button>
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Estoque</label>
+              <select class="form-select" id="estoque-disabled" disabled>
+                {% if central_estoque %}
+                  <option value="{{ central_estoque.id }}">{{ central_estoque.localizacao }}</option>
+                {% else %}
+                  <option>Sem estoque configurado</option>
+                {% endif %}
+              </select>
+              <input type="hidden" id="estoque-hidden" name="estoque" value="{{ central_estoque.id }}">
+              {% for error in form.estoque.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Item</label>
+              <select id="item-select" name="item" class="form-select" style="width:100%;"></select>
+              {% for error in form.item.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="mt-2">
+            <div class="alert alert-light border d-flex align-items-center gap-3 py-2" id="saldo-info" style="display:none;">
+              <i class="bi bi-info-circle text-primary"></i>
+              <div>
+                <div class="small text-muted">Saldo disponível</div>
+                <div><strong id="saldo-valor">0</strong> <span id="saldo-um"></span></div>
+                <div class="small text-muted">Mín: <span id="saldo-min">0</span> | Máx: <span id="saldo-max">0</span></div>
+              </div>
+            </div>
+            <div class="alert alert-danger d-none py-2" id="saldo-alert">Saldo insuficiente para saída.</div>
+          </div>
+          <div class="row g-3 mt-2">
+            <div class="col-md-6">
+              <label class="form-label">Tipo</label>
+              {{ form.tipo_movimentacao }}
+              {% for error in form.tipo_movimentacao.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Quantidade</label>
+              {{ form.quantidade }}
+              {% for error in form.quantidade.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Observação</label>
+            {{ form.observacao }}
+            {% for error in form.observacao.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mt-4 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'movimentacao_list' %}">Cancelar</a>
+            <button class="btn btn-primary" type="submit">Registrar</button>
           </div>
         </form>
       </div>
     </div>
   </div>
 </div>
-=======
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
 
-      <div class="card shadow-lg border-0 rounded-4">
-        <div class="card-body p-4">
-          <h3 class="text-center mb-4 text-primary fw-bold">
-            📝 Registrar Movimentação
-          </h3>
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  (function() {
+    const $itemSelect = $('#item-select');
+    // Inicializa Select2 com busca remota
+    $itemSelect.select2({
+      placeholder: 'Digite código ou nome do item',
+      width: '100%',
+      allowClear: true,
+      ajax: {
+        url: "{% url 'api_item_search' %}",
+        dataType: 'json',
+        delay: 300,
+        data: params => ({ q: params.term }),
+        processResults: data => ({ results: data.results }),
+      }
+    });
 
-          <form method="post" novalidate>
-            {% csrf_token %}
-            {{ form|crispy }}
+    // Se houver item inicial no form Django, define no Select2
+    const preselectedItem = "{{ selected_item_id|default:'' }}";
+    if (preselectedItem) {
+      fetch("{% url 'api_item_search' %}?q=" + preselectedItem)
+        .then(r => r.json())
+        .then(data => {
+          if (data.results && data.results.length) {
+            const opt = new Option(data.results[0].text, data.results[0].id, true, true);
+            $itemSelect.append(opt).trigger('change');
+          }
+          atualizarSaldo();
+        });
+    } else {
+      atualizarSaldo();
+    }
 
-            <div class="d-flex justify-content-between mt-4">
-              <a href="{% url 'index' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Cancelar
-              </a>
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-check-circle"></i> Registrar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+    function atualizarSaldo() {
+      document.getElementById('saldo-alert').classList.add('d-none');
+      const itemId = $itemSelect.val();
+      const estoqueId = document.getElementById('estoque-hidden').value;
+      if (!itemId || !estoqueId) { return; }
+      const saldoBox = document.getElementById('saldo-info');
+      saldoBox.style.opacity = '0.6';
+      fetch(`{% url 'api_item_saldo' %}?item=${itemId}&estoque=${estoqueId}`)
+        .then(resp => resp.json())
+        .then(data => {
+          if (data.saldo !== undefined) {
+            document.getElementById('saldo-valor').textContent = data.saldo;
+            document.getElementById('saldo-min').textContent = data.estoque_minimo;
+            document.getElementById('saldo-max').textContent = data.estoque_maximo;
+            document.getElementById('saldo-um').textContent = data.unidade_medida || '';
+            document.getElementById('saldo-info').style.display = 'flex';
+          }
+          saldoBox.style.opacity = '1';
+          validarSaldo();
+        });
+    }
 
-    </div>
-  </div>
-</div>
+    $itemSelect.on('change', atualizarSaldo);
 
-<!-- Bootstrap Icons (para os ícones de botões) -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    // Desabilita submit se faltar tipo/quantidade ou saldo insuficiente
+    const tipoSelect = document.getElementById('id_tipo_movimentacao');
+    const quantidadeInput = document.getElementById('id_quantidade');
+    const estoqueHidden = document.getElementById('estoque-hidden');
+    const submitBtn = document.querySelector('#mov-form button[type="submit"]');
+    function validarSaldo() {
+      const tipo = tipoSelect.value;
+      const qtd = parseInt(quantidadeInput.value || '0', 10);
+      const saldo = parseInt(document.getElementById('saldo-valor').textContent || '0', 10);
+      const saldoAlert = document.getElementById('saldo-alert');
+      const faltaCampos = !tipo || !qtd || qtd <= 0 || !$itemSelect.val() || !estoqueHidden.value;
+      let bloqueia = faltaCampos;
+      saldoAlert.classList.add('d-none');
+      if (tipo === 'SAIDA' && qtd > saldo) {
+        saldoAlert.classList.remove('d-none');
+        bloqueia = true;
+      }
+      submitBtn.disabled = bloqueia;
+    }
+    tipoSelect.addEventListener('change', validarSaldo);
+    quantidadeInput.addEventListener('input', validarSaldo);
+    $itemSelect.on('change', validarSaldo);
+    document.getElementById('id_estoque').addEventListener('change', validarSaldo);
 
+    // Dispara validação inicial
+    validarSaldo();
+  })();
+</script>
 {% endblock %}
