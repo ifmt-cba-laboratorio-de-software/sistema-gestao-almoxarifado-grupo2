@@ -1,227 +1,344 @@
-
-﻿from django.shortcuts import render, get_object_or_404, redirect
-
-from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib import messages
-from .models import Item, Movimentacao
-from .forms import ItemForm, MovimentacaoForm
-from django.core.paginator import Paginator
-
-from django.contrib.auth import logout
-from datetime import datetime, date
 from decimal import Decimal
-from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Case, When
-from django.utils import timezone
 
-def get_historical_stock_value(end_date):
-    """
-    Calcula o valor total do estoque em uma data específica
-    somando o valor de todas as ENTREDAS e subtraindo o valor de todas as SAÍDAS
-    até essa data.
-    """
-    
-    # Adiciona o fuso horário à data final
-    if not isinstance(end_date, datetime):
-        end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import DecimalField, F, Sum, ExpressionWrapper
+from django.db.models.functions import Coalesce
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 
-    # --- CORREÇÃO DO ERRO: Adicionar output_field em ExpressionWrapper ---
-    
-    # Define o custo negativo para as saídas (SAIDA, RETIRADA)
-    CUSTO_NEGATIVO = ExpressionWrapper(
-        F('quantidade') * F('item__valor_unitario') * Decimal('-1'),
-        # Necessário para forçar o resultado da multiplicação a ser Decimal
-        output_field=DecimalField() 
-    )
-    
-    # Define o custo positivo para as entradas (ENTRADA, DEVOLUCAO)
-    CUSTO_POSITIVO = ExpressionWrapper(
-        F('quantidade') * F('item__valor_unitario'),
-        # Necessário para forçar o resultado da multiplicação a ser Decimal
-        output_field=DecimalField()
-    )
+from .forms import FornecedorForm, InventarioForm, InventarioItemForm, ItemForm, MovimentacaoForm
+from .models import Estoque, Fornecedor, Inventario, InventarioItem, Item, ItemEstoque, Movimentacao
+from .services import registrar_movimentacao
 
-    # Calcula a alteração líquida no valor do estoque até a data final
-    stock_value = Movimentacao.objects.filter(
-        data__lte=end_date
-    ).select_related('item').annotate(
-        # Cria o campo 'valor_movimentado'
-        valor_movimentado=ExpressionWrapper(
-            Case(
-                # ENTRADA / DEVOLUCAO adiciona valor
-                When(tipo__in=['ENTRADA', 'DEVOLUCAO'], 
-                     then=CUSTO_POSITIVO),
-                # SAIDA / RETIRADA reduz valor
-                When(tipo__in=['SAIDA', 'RETIRADA'], 
-                     then=CUSTO_NEGATIVO),
-                # Garante que o Case inteiro retorne um Decimal
-                default=Decimal('0.00'),
-                output_field=DecimalField()
-            ),
-            output_field=DecimalField() # Garante que a anotação final é Decimal
+
+@login_required
+def dashboard(request):
+    itens = Item.objects.annotate(total_qtde=Coalesce(Sum("estoques__qtde"), 0))
+    total_itens = itens.count()
+    valor_total = itens.annotate(
+        total_valor=ExpressionWrapper(
+            F("total_qtde") * F("valor_unitario"),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
         )
-    ).aggregate(
-        total_valor_estoque=Sum('valor_movimentado')
+    ).aggregate(total=Coalesce(Sum("total_valor"), Decimal("0.00"))).get("total")
+
+    criticos = (
+        ItemEstoque.objects.select_related("item", "estoque")
+        .filter(qtde__lt=F("estoque__nivel_minimo"))
+        .order_by("estoque__localizacao", "item__descricao")
     )
-    
-    return stock_value.get('total_valor_estoque') or Decimal('0.00')
+    ultimas_movimentacoes = (
+        Movimentacao.objects.select_related("item", "estoque", "usuario")
+        .order_by("-data_movimentacao")[:8]
+    )
+
+    return render(
+        request,
+        "estoque/dashboard.html",
+        {
+            "total_itens": total_itens,
+            "valor_total": valor_total,
+            "criticos": criticos,
+            "ultimas_movimentacoes": ultimas_movimentacoes,
+        },
+    )
 
 
 @login_required
-@permission_required('estoque.view_movimentacao', raise_exception=True)
-def relatorio_inventario_periodico(request):
-    # --- 1. DEFINIÇÃO DO PERÍODO ---
-    
-    # Pega as datas do formulário (GET), ou usa a data de hoje/início do mês como padrão
-    data_fim_default = date.today().strftime('%Y-%m-%d')
-    data_inicio_default = date.today().replace(day=1).strftime('%Y-%m-%d') # Início do mês atual
-    
-    data_inicio_str = request.GET.get('data_inicio', data_inicio_default)
-    data_fim_str = request.GET.get('data_fim', data_fim_default)
-    
-    try:
-        data_inicio_date = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-        data_fim_date = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        
-        # Cria objetos datetime com horário de início e fim do dia para consultas precisas
-        data_inicio = timezone.make_aware(datetime.combine(data_inicio_date, datetime.min.time()))
-        data_fim = timezone.make_aware(datetime.combine(data_fim_date, datetime.max.time()))
+def item_list(request):
+    query = request.GET.get("q", "").strip()
+    fornecedor_id = request.GET.get("fornecedor")
 
-    except ValueError:
-        messages.error(request, "Formato de data inválido. Use AAAA-MM-DD.")
-        return render(request, 'estoque/relatorio_cmv.html', {})
-        
-    # --- 2. CÁLCULO DAS VARIÁVEIS CHAVE ---
-    
-    # A. Estoque Inicial (EI): Valor total do estoque no final do dia anterior a data_inicio
-    valor_estoque_inicial = get_historical_stock_value(data_inicio)
-    
-    # B. Compras Líquidas (C): Valor de todas as ENTRADAS no período
-    compras_no_periodo = Movimentacao.objects.filter(
-        tipo='ENTRADA',
-        data__range=(data_inicio, data_fim)
-    ).select_related('item')
-    
-    valor_compras_liquidas = Decimal('0.00')
-    for mov in compras_no_periodo:
-        # Soma o valor total de cada entrada (Quantidade * Custo Unitário)
-        valor_compras_liquidas += mov.quantidade * mov.item.valor_unitario
-        
-    # C. Estoque Disponível para Uso (EDU): EI + C
-    valor_estoque_disponivel = valor_estoque_inicial + valor_compras_liquidas
-    
-    # D. Estoque Final (EF): Valor total do estoque no final do dia de data_fim
-    valor_estoque_final_contado = get_historical_stock_value(data_fim)
+    itens = Item.objects.annotate(total_qtde=Coalesce(Sum("estoques__qtde"), 0))
+    if query:
+        itens = itens.filter(
+            models.Q(descricao__icontains=query)
+            | models.Q(codigo__icontains=query)
+            | models.Q(unidade_medida__icontains=query)
+        )
+    if fornecedor_id:
+        itens = itens.filter(fornecedor_id=fornecedor_id)
 
-    # E. Custo de Uso (Saídas): EDU - EF
-    # Custo de Uso = Estoque Inicial + Compras - Estoque Final
-    custo_uso = valor_estoque_disponivel - valor_estoque_final_contado
-    
-    # Filtra os itens com estoque final > 0 para detalhamento
-    itens_detalhe = Item.objects.all().filter(quantidade_atual__gt=0).order_by('descricao')
-    
-    context = {
-        'data_inicio': data_inicio_str,
-        'data_fim': data_fim_str,
-        'valor_estoque_inicial': valor_estoque_inicial,
-        'valor_compras_liquidas': valor_compras_liquidas,
-        'valor_estoque_disponivel': valor_estoque_disponivel,
-        'valor_estoque_final_contado': valor_estoque_final_contado,
-        'custo_uso': custo_uso, # Variável renomeada
-        'itens': itens_detalhe
-    }
+    fornecedores = Fornecedor.objects.order_by("nome")
 
-    return render(request, 'estoque/relatorio_cmv.html', context)
+    return render(
+        request,
+        "estoque/item_list.html",
+        {"itens": itens, "fornecedores": fornecedores, "q": query, "fornecedor_id": fornecedor_id},
+    )
+
 
 @login_required
-def index(request):
-    items = Item.objects.all().order_by('descricao')
-    paginator = Paginator(items, 20)
-    page = request.GET.get('page')
-    items = paginator.get_page(page)
-    return render(request, 'estoque/item_list.html', {'items': items})
-
-@login_required
-@permission_required('estoque.add_item', raise_exception=True)
 def item_create(request):
-    if request.method == 'POST':
-        form = ItemForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Item criado com sucesso.')
-            return redirect('index')
-    else:
-        form = ItemForm()
-    return render(request, 'estoque/item_form.html', {'form': form})
+    form = ItemForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Item criado com sucesso.")
+        return redirect("item_list")
+    return render(request, "estoque/item_form.html", {"form": form})
+
 
 @login_required
-@permission_required('estoque.change_item', raise_exception=True)
 def item_edit(request, pk):
     item = get_object_or_404(Item, pk=pk)
-    if request.method == 'POST':
-        form = ItemForm(request.POST, instance=item)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Item atualizado com sucesso.')
-            return redirect('index')
-    else:
-        form = ItemForm(instance=item)
-    return render(request, 'estoque/item_form.html', {'form': form, 'item': item})
+    form = ItemForm(request.POST or None, instance=item)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Item atualizado com sucesso.")
+        return redirect("item_list")
+    return render(request, "estoque/item_form.html", {"form": form, "item": item})
+
 
 @login_required
-@permission_required('estoque.delete_item', raise_exception=True)
-def item_delete(request, pk):
-    item = get_object_or_404(Item, pk=pk)
-
-    if request.method == 'POST':
-        item.delete()
-        messages.success(request, 'Item removido.')
-    else:
-        messages.error(request, 'Acao invalida para exclusao.')
-
-    item.delete()
-    messages.success(request, 'Item removido.')
- 
-    return redirect('index')
-
-@login_required
-@permission_required('estoque.add_movimentacao', raise_exception=True)
-def movimentacao_create(request):
-    if request.method == 'POST':
-        form = MovimentacaoForm(request.POST)
-        if form.is_valid():
-            mov = form.save(commit=False)
-            mov.usuario = request.user
-            mov.save()
- develop
-            messages.success(request, 'Movimentacao registrada.')
-            return redirect('movimentacao_list')
-
-            messages.success(request, 'Movimentação registrada.')
-            return redirect('index')
-
-    else:
-        form = MovimentacaoForm()
-    return render(request, 'estoque/movimentacao_form.html', {'form': form})
-
-@login_required
-
 def movimentacao_list(request):
-    movimentos = Movimentacao.objects.select_related('item', 'usuario').order_by('-data')
-    paginator = Paginator(movimentos, 20)
-    page = request.GET.get('page')
-    movimentos_page = paginator.get_page(page)
-    return render(request, 'estoque/movimentacao_list.html', {'movimentos': movimentos_page})
+    movimentacoes = (
+        Movimentacao.objects.select_related("item", "estoque", "usuario")
+        .order_by("-data_movimentacao")
+    )
+    return render(request, "estoque/movimentacao_list.html", {"movimentacoes": movimentacoes})
+
 
 @login_required
+def movimentacao_create(request):
+    initial = {}
+    # Trava estoque em Depósito Central (ou primeiro disponível)
+    central = (
+        Estoque.objects.filter(localizacao__iexact="Depósito Central").first()
+        or Estoque.objects.first()
+    )
+    if central:
+        initial["estoque"] = central
+    if request.GET.get("tipo"):
+        initial["tipo_movimentacao"] = request.GET.get("tipo")
 
-def item_detail(request, pk):
-    item = get_object_or_404(Item, pk=pk)
-    movimentos = Movimentacao.objects.filter(item=item).order_by('-data')[:50]
-    return render(request, 'estoque/item_detail.html', {'item': item, 'movimentos': movimentos})
+    form = MovimentacaoForm(request.POST or None, initial=initial)
+    selected_item_id = ""
+    if request.method == "POST":
+        selected_item_id = request.POST.get("item", "")
+    else:
+        initial_item = form.initial.get("item")
+        if initial_item:
+            selected_item_id = getattr(initial_item, "id", initial_item)
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            registrar_movimentacao(
+                usuario=request.user,
+                **form.cleaned_data,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            # Guarda último estoque escolhido
+            if central:
+                request.session["last_estoque_id"] = central.id
+            messages.success(request, "Movimentação registrada.")
+            return redirect("movimentacao_list")
+
+    return render(
+        request,
+        "estoque/movimentacao_form.html",
+        {"form": form, "selected_item_id": selected_item_id, "central_estoque": central},
+    )
 
 
 @login_required
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect("login")
 
+
+@login_required
+def inventario_list(request):
+    inventarios = Inventario.objects.select_related("usuario").order_by("-data_inventario")
+    return render(request, "estoque/inventario_list.html", {"inventarios": inventarios})
+
+
+@login_required
+def inventario_create(request):
+    form = InventarioForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        inventario = form.save(commit=False)
+        inventario.usuario = request.user
+        inventario.save()
+        messages.success(request, "Inventário criado. Registre as contagens.")
+        return redirect("inventario_detail", pk=inventario.pk)
+    return render(request, "estoque/inventario_form.html", {"form": form})
+
+
+@login_required
+def inventario_detail(request, pk):
+    inventario = get_object_or_404(Inventario, pk=pk)
+    form = InventarioItemForm(request.POST or None)
+    itens = InventarioItem.objects.select_related("item").filter(inventario=inventario)
+    estoques = Estoque.objects.order_by("localizacao")
+
+    # Contagem rápida por código
+    if request.method == "POST" and request.POST.get("codigo_lookup"):
+        codigo = request.POST.get("codigo_lookup").strip()
+        qtde_lookup = int(request.POST.get("qtde_lookup") or 0)
+        try:
+            item = Item.objects.get(codigo=codigo)
+            inv_item, _ = InventarioItem.objects.get_or_create(inventario=inventario, item=item, defaults={"qtde_contada": 0})
+            inv_item.qtde_contada = qtde_lookup
+            inv_item.save()
+            messages.success(request, f"Contagem registrada para {item.descricao}.")
+        except Item.DoesNotExist:
+            messages.error(request, "Item não encontrado para o código informado.")
+        return redirect("inventario_detail", pk=pk)
+
+    if request.method == "POST" and form.is_valid():
+        inv_item = form.save(commit=False)
+        inv_item.inventario = inventario
+        inv_item.save()
+        messages.success(request, "Contagem registrada no inventário.")
+        return redirect("inventario_detail", pk=pk)
+
+    return render(
+        request,
+        "estoque/inventario_detail.html",
+        {"inventario": inventario, "form": form, "itens": itens, "estoques": estoques},
+    )
+
+
+@login_required
+def inventario_encerrar(request, pk):
+    inventario = get_object_or_404(Inventario, pk=pk)
+    if request.method != "POST":
+        return redirect("inventario_detail", pk=pk)
+    estoque_id = request.POST.get("estoque_id")
+    estoque = get_object_or_404(Estoque, pk=estoque_id) if estoque_id else None
+    if not estoque:
+        messages.error(request, "Selecione um estoque para aplicar os ajustes.")
+        return redirect("inventario_detail", pk=pk)
+
+    ajustes_criados = 0
+    for inv_item in inventario.itens.select_related("item"):
+        saldo = (
+            ItemEstoque.objects.filter(item=inv_item.item, estoque=estoque)
+            .aggregate(total=Coalesce(Sum("qtde"), 0))
+            .get("total")
+            or 0
+        )
+        diff = inv_item.qtde_contada - saldo
+        if diff == 0:
+            continue
+        try:
+            registrar_movimentacao(
+                usuario=request.user,
+                item=inv_item.item,
+                estoque=estoque,
+                tipo_movimentacao=Movimentacao.Tipo.AJUSTE if diff > 0 else Movimentacao.Tipo.SAIDA,
+                quantidade=abs(diff),
+                observacao=f"Ajuste inventário {inventario.id}",
+            )
+            ajustes_criados += 1
+        except ValidationError as exc:
+            messages.error(request, f"Erro ao ajustar {inv_item.item}: {exc.message}")
+    if ajustes_criados:
+        messages.success(request, f"Inventário encerrado com {ajustes_criados} ajustes.")
+    else:
+        messages.info(request, "Inventário encerrado sem ajustes necessários.")
+    return redirect("inventario_detail", pk=pk)
+
+
+# --- CRUD de Fornecedor ---
+@login_required
+def fornecedor_list(request):
+    fornecedores = Fornecedor.objects.order_by("nome")
+    return render(request, "estoque/fornecedor_list.html", {"fornecedores": fornecedores})
+
+
+@login_required
+def fornecedor_create(request):
+    form = FornecedorForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Fornecedor cadastrado com sucesso.")
+        return redirect("fornecedor_list")
+    return render(request, "estoque/fornecedor_form.html", {"form": form})
+
+
+@login_required
+def fornecedor_edit(request, pk):
+    fornecedor = get_object_or_404(Fornecedor, pk=pk)
+    form = FornecedorForm(request.POST or None, instance=fornecedor)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Fornecedor atualizado com sucesso.")
+        return redirect("fornecedor_list")
+    return render(request, "estoque/fornecedor_form.html", {"form": form, "fornecedor": fornecedor})
+
+
+@login_required
+def fornecedor_delete(request, pk):
+    fornecedor = get_object_or_404(Fornecedor, pk=pk)
+    if request.method == "POST":
+        fornecedor.delete()
+        messages.success(request, "Fornecedor removido.")
+        return redirect("fornecedor_list")
+    return render(request, "estoque/fornecedor_form.html", {"form": None, "fornecedor": fornecedor, "confirm_delete": True})
+
+
+# --- APIs auxiliares para UX ---
+@login_required
+def api_item_search(request):
+    """Busca rápida para autocomplete de itens."""
+    q = request.GET.get("q", "").strip()
+    itens = Item.objects.all()
+    if q:
+        itens = itens.filter(models.Q(descricao__icontains=q) | models.Q(codigo__icontains=q))
+    itens = itens.order_by("descricao")[:15]
+    data = [
+        {
+            "id": item.id,
+            "text": f"{item.codigo} - {item.descricao}" if item.codigo else item.descricao,
+        }
+        for item in itens
+    ]
+    return JsonResponse({"results": data})
+
+
+@login_required
+def api_item_saldo(request):
+    """Retorna saldo por item/estoque e min/máx configurados."""
+    item_id = request.GET.get("item")
+    estoque_id = request.GET.get("estoque")
+    if not item_id or not estoque_id:
+        return JsonResponse({"error": "Parâmetros faltando"}, status=400)
+
+    try:
+        item = Item.objects.get(pk=item_id)
+        saldo = (
+            item.estoques.filter(estoque_id=estoque_id)
+            .aggregate(total=Coalesce(Sum("qtde"), 0))
+            .get("total")
+            or 0
+        )
+    except Item.DoesNotExist:
+        return JsonResponse({"error": "Item não encontrado"}, status=404)
+
+    return JsonResponse(
+        {
+            "saldo": saldo,
+            "estoque_minimo": item.estoque_minimo,
+            "estoque_maximo": item.estoque_maximo,
+            "unidade_medida": item.unidade_medida,
+        }
+    )
+
+
+@login_required
+def api_fornecedor_create(request):
+    """Cria fornecedor via AJAX."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    form = FornecedorForm(request.POST)
+    if form.is_valid():
+        fornecedor = form.save()
+        return JsonResponse({"id": fornecedor.id, "nome": fornecedor.nome})
+    return JsonResponse({"errors": form.errors}, status=400)

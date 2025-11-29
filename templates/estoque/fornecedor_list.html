@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Fornecedores{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Fornecedores</h4>
+    <small class="text-muted">Cadastre e gerencie fornecedores.</small>
+  </div>
+  <a class="btn btn-primary btn-icon" href="{% url 'fornecedor_create' %}">
+    <i class="bi bi-plus-circle"></i> Novo fornecedor
+  </a>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th>CNPJ</th>
+            <th>Contato</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for forn in fornecedores %}
+          <tr>
+            <td class="fw-semibold">{{ forn.nome }}</td>
+            <td>{{ forn.cnpj|default:"-" }}</td>
+            <td>{{ forn.contato|default:"-" }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'fornecedor_edit' forn.pk %}">
+                <i class="bi bi-pencil-square"></i> Editar
+              </a>
+              <form action="{% url 'fornecedor_delete' forn.pk %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">
+                  <i class="bi bi-trash"></i> Excluir
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">Nenhum fornecedor cadastrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
