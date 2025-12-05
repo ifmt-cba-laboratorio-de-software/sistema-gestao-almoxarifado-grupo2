@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/versão-1.0-blue?style=for-the-badge" alt="Versão 1.0">
+  <img src="https://img.shields.io/badge/versão-2.0-blue?style=for-the-badge" alt="Versão 1.0">
   <img src="https://img.shields.io/badge/license-BSD-blue?style=for-the-badge" alt="Licença BSD">
   <img src="https://img.shields.io/badge/status-em%20desenvolvimento-yellow?style=for-the-badge" alt="Status de desenvolvimento">
 </p>
@@ -49,9 +49,21 @@ Projeto de extensão universitária desenvolvido pelos alunos do 5º semestre do
 - **Docente:** Profª Esp. Heloise de Souza Bastos
 - **Colaboradores:** Técnicos e gestores da FUNAC
 
+| Desenvolvedor | Contribuição |
+|---------------|--------------|
+| Sergio Pytagoras Constantini | Iniciou o projeto e criou os apps das telas |
+| Guilherme Guia | Iniciou o projeto e criou os apps das telas |
+| Valéria Alves | Desenvolveu o CRUD do Fornecedor |
+| Wilker Neves | Criou a aba Inventário |
+| Diogo Cesar Furlan | Criou a aba Movimentações |
+| Leandro Campos | Criou a aba Itens |
+| Yuri Batista | Desenvolveu o Dashboard e elaborou o README |
+
+
 ## 💻Tecnologias Utilizadas
 - **Linguagens:** Python
 - **Framework:** Django
+- **Banco de Dados:** SQLite3
 - **Ferramentas de Versionamento:** Git, GitHub
 - **Outras:** Markdown para documentação
 
