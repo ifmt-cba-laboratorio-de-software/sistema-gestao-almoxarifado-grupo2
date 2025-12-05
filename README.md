@@ -51,13 +51,13 @@ Projeto de extensão universitária desenvolvido pelos alunos do 5º semestre do
 
 | Desenvolvedor | Contribuição |
 |---------------|--------------|
-| Sergio Pytagoras Constantini | Iniciou o projeto e criou os apps das telas |
-| Guilherme Guia | Iniciou o projeto e criou os apps das telas |
-| Valéria Alves | Desenvolveu o CRUD do Fornecedor |
-| Wilker Neves | Criou a aba Inventário |
-| Diogo Cesar Furlan | Criou a aba Movimentações |
-| Leandro Campos | Criou a aba Itens |
-| Yuri Batista | Desenvolveu o Dashboard e elaborou o README |
+| Sergio Pytagoras Constantini | Prepação de Ambiente e Design |
+| Guilherme Guia | Prepação de Ambiente e Design |
+| Valéria Alves | Funcionalidade Fornecedor |
+| Wilker Neves | Funcionalidade Inventário |
+| Diogo Cesar Furlan | Funcionalidade Movimentações |
+| Leandro Campos | Funcionalidade Itens |
+| Yuri Batista | Funcionalidade Dashboard |
 
 
 ## 💻Tecnologias Utilizadas
